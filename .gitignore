@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Terraform / Secrets
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars.local
+.env
+*.pem
+*.key
+
+# Runtime data
+data/

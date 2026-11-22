@@ -1,0 +1,62 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  # Em produção no GCP, habilitar googlecloudpubsub:
+  # googlecloudpubsub:
+  #   project: prototipo-puc
+  #   subscription: projects/prototipo-puc/subscriptions/telemetry-ingest-sub
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 1024
+
+  batch:
+    timeout: 200ms
+    send_batch_size: 512
+
+  transform/ocsf_6003:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # Metadados canônicos OCSF v1.9.0 - API Activity (6003)
+          - set(attributes["ocsf.category_uid"], 6)
+          - set(attributes["ocsf.class_uid"], 6003)
+          - set(attributes["ocsf.metadata.version"], "1.9.0")
+
+          # AWS CloudTrail -> OCSF 6003
+          - set(attributes["ocsf.api.service.name"], body["eventSource"]) where body["eventSource"] != nil
+          - set(attributes["ocsf.api.operation"], body["eventName"]) where body["eventName"] != nil
+          - set(attributes["ocsf.src_endpoint.ip"], body["sourceIPAddress"]) where body["sourceIPAddress"] != nil
+          - set(attributes["ocsf.actor.user.uid"], body["userIdentity"]["arn"]) where body["userIdentity"]["arn"] != nil
+          - set(attributes["ocsf.resources.name"], body["requestParameters"]["bucketName"]) where body["requestParameters"]["bucketName"] != nil
+
+          # Azure Activity Log (ARM) -> OCSF 6003
+          - set(attributes["ocsf.api.operation"], body["operationName"]["value"]) where body["operationName"]["value"] != nil
+          - set(attributes["ocsf.actor.user.uid"], body["caller"]) where body["caller"] != nil
+          - set(attributes["ocsf.resources.uid"], body["resourceId"]) where body["resourceId"] != nil
+          - set(attributes["ocsf.src_endpoint.ip"], body["httpRequest"]["clientIpAddress"]) where body["httpRequest"]["clientIpAddress"] != nil
+
+          # GCP Cloud Audit Logs (ProtoJSON v2) -> OCSF 6003
+          - set(attributes["ocsf.api.service.name"], body["protoPayload"]["serviceName"]) where body["protoPayload"]["serviceName"] != nil
+          - set(attributes["ocsf.api.operation"], body["protoPayload"]["methodName"]) where body["protoPayload"]["methodName"] != nil
+          - set(attributes["ocsf.actor.user.uid"], body["protoPayload"]["authenticationInfo"]["principalEmail"]) where body["protoPayload"]["authenticationInfo"]["principalEmail"] != nil
+          - set(attributes["ocsf.src_endpoint.ip"], body["protoPayload"]["requestMetadata"]["callerIp"]) where body["protoPayload"]["requestMetadata"]["callerIp"] != nil
+
+exporters:
+  file/ocsf_out:
+    path: /var/log/otel-out/ocsf_6003_normalized.jsonl
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/ocsf_6003, batch]
+      exporters: [file/ocsf_out, debug]

@@ -1,0 +1,42 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel-collector/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./data:/var/log/otel-out
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - telemetry_net
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - ai_airgapped_net
+    restart: unless-stopped
+
+  ai-resilience:
+    build:
+      context: ./ai-resilience
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - SLM_MODEL=gemma3:1b
+    depends_on:
+      - ollama
+    networks:
+      - telemetry_net
+      - ai_airgapped_net
+
+networks:
+  telemetry_net:
+    driver: bridge
+  ai_airgapped_net:
+    driver: bridge
+    internal: true  # Impede egress para a internet (air-gapped)
+
+volumes:
+  ollama_models:

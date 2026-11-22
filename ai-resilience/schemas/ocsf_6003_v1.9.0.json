@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OCSF v1.9.0 API Activity (6003)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "category_uid",
+    "class_uid",
+    "activity_id",
+    "type_uid",
+    "time",
+    "metadata",
+    "actor",
+    "api",
+    "src_endpoint",
+    "status_id"
+  ],
+  "properties": {
+    "category_uid": { "const": 6 },
+    "class_uid": { "const": 6003 },
+    "activity_id": { "type": "integer", "enum": [0, 1, 2, 3, 4, 99] },
+    "type_uid": { "type": "integer", "minimum": 600300, "maximum": 600399 },
+    "time": { "type": "integer", "minimum": 1 },
+    "status_id": { "type": "integer", "enum": [0, 1, 2, 99] },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "product"],
+      "properties": {
+        "version": { "const": "1.9.0" },
+        "product": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "vendor_name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "vendor_name": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user"],
+      "properties": {
+        "user": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["uid"],
+          "properties": {
+            "uid": { "type": "string", "minLength": 1 },
+            "name": { "type": "string" },
+            "email_addr": { "type": "string" }
+          }
+        }
+      }
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "service"],
+      "properties": {
+        "operation": { "type": "string", "minLength": 1 },
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "src_endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ip"],
+      "properties": {
+        "ip": { "type": "string", "minLength": 3 }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "uid": { "type": "string" },
+          "type": { "type": "string" }
+        }
+      }
+    }
+  }
+}

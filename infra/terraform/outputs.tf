@@ -2,6 +2,14 @@ output "project_id" {
   value = var.project_id
 }
 
+output "artifact_registry_repo" {
+  value = google_artifact_registry_repository.tcc_repo.id
+}
+
+output "logging_sink_writer_identity" {
+  value = google_logging_project_sink.audit_sink.writer_identity
+}
+
 output "pubsub_ingest_topic" {
   value = google_pubsub_topic.telemetry_ingest.id
 }

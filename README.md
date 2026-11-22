@@ -75,30 +75,44 @@ Verifique os containers em execução:
 docker compose ps
 ```
 
-### Passo 5: Enviar evento de teste e validar no Splunk (`index="otel_ocsf"`)
-1. Envie um payload OTLP de teste (formato AWS CloudTrail) para o OTel Collector na porta `4318`:
+### Passo 5: Gerar dados de teste (Normal e Drift) e validar no Splunk
+1. Na pasta `prototype/`, utilize o script `gerar_testes.ps1` para enviar eventos normais, de *schema drift* ou ambos:
    ```powershell
-   curl -X POST http://localhost:4318/v1/logs -H "Content-Type: application/json" -d "{\"resourceLogs\":[{\"scopeLogs\":[{\"logRecords\":[{\"body\":{\"kvlistValue\":{\"values\":[{\"key\":\"eventSource\",\"value\":{\"stringValue\":\"s3.amazonaws.com\"}},{\"key\":\"eventName\",\"value\":{\"stringValue\":\"CreateBucket\"}},{\"key\":\"sourceIPAddress\",\"value\":{\"stringValue\":\"198.51.100.42\"}}]}}}]}]}]}"
+   .\gerar_testes.ps1                        # Envia normais (AWS/Azure/GCP) + drift
+   .\gerar_testes.ps1 -Modo normal -Repeticoes 5
+   .\gerar_testes.ps1 -Modo drift
    ```
-2. Confirme a saída normalizada no arquivo local `data/ocsf_6003_normalized.jsonl`.
+   *(Ou via Python: `python simulator/generate_events.py --mode both --count 1`.)*
+2. Confirme as saídas nos arquivos locais `data/ocsf_6003_normalized.jsonl` e `data/dlq_quarantine.jsonl`.
 3. Acesse o Splunk Web (`http://localhost:8000`) $\rightarrow$ **Search & Reporting** e execute:
-   ```spl
-   index="otel_ocsf" sourcetype="ocsf:api_activity:6003"
-   ```
-   Você verá o evento já normalizado com os atributos `ocsf.class_uid=6003`, `ocsf.metadata.version=1.9.0`, `ocsf.api.service.name=s3.amazonaws.com` e `ocsf.api.operation=CreateBucket`.
+   - **Eventos válidos OCSF `v1.9.0` (`6003`):**
+     ```spl
+     index="otel_ocsf" sourcetype="ocsf:api_activity:6003"
+     ```
+   - **Eventos em Quarentena / Schema Drift (DLQ):**
+     ```spl
+     index="otel_ocsf" sourcetype="ocsf:quarantine:dlq"
+     ```
 
 ---
 
-## Deploy no GCP (`prototipo-puc`)
+## Deploy no GCP (`prototipo-puc`) — Logs Reais do Tenant
 
-1. Provisionar infraestrutura (VM `e2-standard-4` Spot, Pub/Sub, IAM e rede *air-gapped*):
-   ```bash
+1. Autenticar no GCP com sua conta do tenant:
+   ```powershell
+   gcloud auth login
+   gcloud auth application-default login
+   gcloud config set project prototipo-puc
+   ```
+2. Provisionar toda a infraestrutura (APIs, Artifact Registry `tcc-repo`, Log Sink de Cloud Audit Logs $\rightarrow$ Pub/Sub, IAM de menor privilégio, VPC com *Private Google Access* e VM `e2-standard-4` Spot):
+   ```powershell
    cd infra/terraform
    terraform init
    terraform plan
    terraform apply
    ```
-2. Ao concluir os ensaios do laboratório, destruir os recursos para evitar cobrança contínua:
-   ```bash
+3. *(Opcional para CD automático via GitHub Actions)* Configurar o *Workload Identity Pool* (`github-pool` / `github-provider`) no projeto `prototipo-puc` (`811890592302`) vinculado ao repositório `mvbaldivia/prototipo-puc`.
+4. Ao concluir os ensaios do laboratório, destruir os recursos para evitar cobrança contínua:
+   ```powershell
    terraform destroy
    ```

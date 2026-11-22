@@ -24,33 +24,96 @@ processors:
     log_statements:
       - context: log
         statements:
-          # Metadados canônicos OCSF v1.9.0 - API Activity (6003)
-          - set(attributes["ocsf.category_uid"], 6)
-          - set(attributes["ocsf.class_uid"], 6003)
-          - set(attributes["ocsf.metadata.version"], "1.9.0")
+          # Salva o payload bruto em cache e atributo temporário antes de reconstruir o body OCSF v1.9.0 (6003)
+          - 'set(cache["raw"], body)'
+          - 'set(attributes["_raw_payload"], body)'
+          - 'set(body, ParseJSON("{}"))'
+
+          # Cabeçalho canônico OCSF v1.9.0 - API Activity (6003)
+          - 'set(body["category_uid"], 6)'
+          - 'set(body["category_name"], "Application Activity")'
+          - 'set(body["class_uid"], 6003)'
+          - 'set(body["class_name"], "API Activity")'
+          - 'set(body["activity_id"], 1)'
+          - 'set(body["activity_name"], "Create")'
+          - 'set(body["type_uid"], 600301)'
+          - 'set(body["severity_id"], 1)'
+          - 'set(body["severity"], "Informational")'
+          - 'set(body["status_id"], 1)'
+          - 'set(body["status"], "Success")'
+          - 'set(body["metadata"]["version"], "1.9.0")'
 
           # AWS CloudTrail -> OCSF 6003
-          - set(attributes["ocsf.api.service.name"], body["eventSource"]) where body["eventSource"] != nil
-          - set(attributes["ocsf.api.operation"], body["eventName"]) where body["eventName"] != nil
-          - set(attributes["ocsf.src_endpoint.ip"], body["sourceIPAddress"]) where body["sourceIPAddress"] != nil
-          - set(attributes["ocsf.actor.user.uid"], body["userIdentity"]["arn"]) where body["userIdentity"]["arn"] != nil
-          - set(attributes["ocsf.resources.name"], body["requestParameters"]["bucketName"]) where body["requestParameters"]["bucketName"] != nil
+          - 'set(body["metadata"]["product"]["vendor_name"], "AWS") where cache["raw"]["eventSource"] != nil'
+          - 'set(body["metadata"]["product"]["name"], "CloudTrail") where cache["raw"]["eventSource"] != nil'
+          - 'set(body["api"]["service"]["name"], cache["raw"]["eventSource"]) where cache["raw"]["eventSource"] != nil'
+          - 'set(body["api"]["operation"], cache["raw"]["eventName"]) where cache["raw"]["eventName"] != nil'
+          - 'set(body["src_endpoint"]["ip"], cache["raw"]["sourceIPAddress"]) where cache["raw"]["sourceIPAddress"] != nil'
+          - 'set(body["actor"]["user"]["uid"], cache["raw"]["userIdentity"]["arn"]) where cache["raw"]["userIdentity"]["arn"] != nil'
+          - 'set(body["actor"]["user"]["type"], cache["raw"]["userIdentity"]["type"]) where cache["raw"]["userIdentity"]["type"] != nil'
+          - 'set(body["resources"], ParseJSON("[{}]")) where cache["raw"]["requestParameters"]["bucketName"] != nil'
+          - 'set(body["resources"][0]["name"], cache["raw"]["requestParameters"]["bucketName"]) where cache["raw"]["requestParameters"]["bucketName"] != nil'
+          - 'set(body["resources"][0]["type"], "S3 Bucket") where cache["raw"]["requestParameters"]["bucketName"] != nil'
 
           # Azure Activity Log (ARM) -> OCSF 6003
-          - set(attributes["ocsf.api.operation"], body["operationName"]["value"]) where body["operationName"]["value"] != nil
-          - set(attributes["ocsf.actor.user.uid"], body["caller"]) where body["caller"] != nil
-          - set(attributes["ocsf.resources.uid"], body["resourceId"]) where body["resourceId"] != nil
-          - set(attributes["ocsf.src_endpoint.ip"], body["httpRequest"]["clientIpAddress"]) where body["httpRequest"]["clientIpAddress"] != nil
+          - 'set(body["metadata"]["product"]["vendor_name"], "Microsoft") where cache["raw"]["operationName"]["value"] != nil'
+          - 'set(body["metadata"]["product"]["name"], "Azure Activity Log") where cache["raw"]["operationName"]["value"] != nil'
+          - 'set(body["api"]["service"]["name"], "management.azure.com") where cache["raw"]["operationName"]["value"] != nil'
+          - 'set(body["api"]["operation"], cache["raw"]["operationName"]["value"]) where cache["raw"]["operationName"]["value"] != nil'
+          - 'set(body["actor"]["user"]["uid"], cache["raw"]["caller"]) where cache["raw"]["caller"] != nil'
+          - 'set(body["src_endpoint"]["ip"], cache["raw"]["httpRequest"]["clientIpAddress"]) where cache["raw"]["httpRequest"]["clientIpAddress"] != nil'
+          - 'set(body["resources"], ParseJSON("[{}]")) where cache["raw"]["resourceId"] != nil'
+          - 'set(body["resources"][0]["uid"], cache["raw"]["resourceId"]) where cache["raw"]["resourceId"] != nil'
+          - 'set(body["resources"][0]["type"], "Azure Resource") where cache["raw"]["resourceId"] != nil'
 
           # GCP Cloud Audit Logs (ProtoJSON v2) -> OCSF 6003
-          - set(attributes["ocsf.api.service.name"], body["protoPayload"]["serviceName"]) where body["protoPayload"]["serviceName"] != nil
-          - set(attributes["ocsf.api.operation"], body["protoPayload"]["methodName"]) where body["protoPayload"]["methodName"] != nil
-          - set(attributes["ocsf.actor.user.uid"], body["protoPayload"]["authenticationInfo"]["principalEmail"]) where body["protoPayload"]["authenticationInfo"]["principalEmail"] != nil
-          - set(attributes["ocsf.src_endpoint.ip"], body["protoPayload"]["requestMetadata"]["callerIp"]) where body["protoPayload"]["requestMetadata"]["callerIp"] != nil
+          - 'set(body["metadata"]["product"]["vendor_name"], "Google Cloud") where cache["raw"]["protoPayload"]["serviceName"] != nil'
+          - 'set(body["metadata"]["product"]["name"], "Cloud Audit Logs") where cache["raw"]["protoPayload"]["serviceName"] != nil'
+          - 'set(body["api"]["service"]["name"], cache["raw"]["protoPayload"]["serviceName"]) where cache["raw"]["protoPayload"]["serviceName"] != nil'
+          - 'set(body["api"]["operation"], cache["raw"]["protoPayload"]["methodName"]) where cache["raw"]["protoPayload"]["methodName"] != nil'
+          - 'set(body["actor"]["user"]["uid"], cache["raw"]["protoPayload"]["authenticationInfo"]["principalEmail"]) where cache["raw"]["protoPayload"]["authenticationInfo"]["principalEmail"] != nil'
+          - 'set(body["src_endpoint"]["ip"], cache["raw"]["protoPayload"]["requestMetadata"]["callerIp"]) where cache["raw"]["protoPayload"]["requestMetadata"]["callerIp"] != nil'
+
+  # Descarta eventos sem campos obrigatórios OCSF 6003 do fluxo nominal (Splunk)
+  filter/drop_invalid:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'body["api"]["operation"] == nil or body["src_endpoint"]["ip"] == nil'
+
+  # Mantém apenas eventos com schema drift / inválidos na fila de Quarentena (DLQ)
+  filter/drop_valid:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'body["api"]["operation"] != nil and body["src_endpoint"]["ip"] != nil'
+
+  # Remove atributo temporário nos eventos nominais (mantém apenas OCSF v1.9.0 limpo)
+  transform/clean_nominal:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - 'delete_key(attributes, "_raw_payload")'
+
+  # Enriquecimento de metadados de quarentena + payload original antes de enviar para DLQ / Splunk
+  transform/quarantine_meta:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - 'set(body, ParseJSON("{}"))'
+          - 'set(body["quarantine_status"], "QUARANTINED_SCHEMA_DRIFT")'
+          - 'set(body["quarantine_reason"], "Missing required OCSF v1.9.0 fields (api.operation or src_endpoint.ip)")'
+          - 'set(body["target_ocsf_version"], "1.9.0")'
+          - 'set(body["raw_payload"], attributes["_raw_payload"])'
+          - 'delete_key(attributes, "_raw_payload")'
 
 exporters:
   file/ocsf_out:
     path: /var/log/otel-out/ocsf_6003_normalized.jsonl
+  file/dlq_out:
+    path: /var/log/otel-out/dlq_quarantine.jsonl
   splunk_hec:
     token: "${env:SPLUNK_HEC_TOKEN}"
     endpoint: "${env:SPLUNK_HEC_ENDPOINT}"
@@ -59,12 +122,24 @@ exporters:
     index: "otel_ocsf"
     tls:
       insecure_skip_verify: true
+  splunk_hec/quarantine:
+    token: "${env:SPLUNK_HEC_TOKEN}"
+    endpoint: "${env:SPLUNK_HEC_ENDPOINT}"
+    source: "otel-collector-dlq"
+    sourcetype: "ocsf:quarantine:dlq"
+    index: "otel_ocsf"
+    tls:
+      insecure_skip_verify: true
   debug:
     verbosity: basic
 
 service:
   pipelines:
-    logs:
+    logs/nominal:
       receivers: [otlp]
-      processors: [memory_limiter, transform/ocsf_6003, batch]
+      processors: [memory_limiter, transform/ocsf_6003, filter/drop_invalid, transform/clean_nominal, batch]
       exporters: [file/ocsf_out, splunk_hec, debug]
+    logs/quarantine:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/ocsf_6003, filter/drop_valid, transform/quarantine_meta, batch]
+      exporters: [file/dlq_out, splunk_hec/quarantine, debug]

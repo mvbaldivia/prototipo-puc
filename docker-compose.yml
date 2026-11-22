@@ -26,7 +26,8 @@ services:
 
   ai-resilience:
     build:
-      context: ./ai-resilience
+      context: .
+      dockerfile: ai-resilience/Dockerfile
     environment:
       - OLLAMA_HOST=http://ollama:11434
       - SLM_MODEL=gemma3:1b

@@ -1,29 +1,74 @@
-# Rede privada isolada para o pipeline e SLM local
+locals {
+  required_apis = [
+    "compute.googleapis.com",
+    "pubsub.googleapis.com",
+    "logging.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "iamcredentials.googleapis.com",
+  ]
+}
+
+# Habilita APIs necessárias no projeto prototipo-puc
+resource "google_project_service" "services" {
+  for_each           = toset(local.required_apis)
+  project            = var.project_id
+  service            = each.value
+  disable_on_destroy = false
+}
+
+# Repositório Artifact Registry para imagens do módulo ai-resilience (usado pelo Cloud Build)
+resource "google_artifact_registry_repository" "tcc_repo" {
+  location      = var.region
+  repository_id = "tcc-repo"
+  description   = "Repositório Docker do protótipo TCC PUCPR (OTel + OCSF + SLM)"
+  format        = "DOCKER"
+  depends_on    = [google_project_service.services]
+}
+
+# Rede privada isolada com Private Google Access (sem IP público externo)
 resource "google_compute_network" "pipeline_vpc" {
   name                    = "otel-ocsf-vpc"
   auto_create_subnetworks = false
+  depends_on              = [google_project_service.services]
 }
 
 resource "google_compute_subnetwork" "pipeline_subnet" {
-  name          = "otel-ocsf-subnet"
-  ip_cidr_range = "10.20.0.0/24"
-  region        = var.region
-  network       = google_compute_network.pipeline_vpc.id
+  name                     = "otel-ocsf-subnet"
+  ip_cidr_range            = "10.20.0.0/24"
+  region                   = var.region
+  network                  = google_compute_network.pipeline_vpc.id
+  private_ip_google_access = true
 }
 
-# Bloqueia egress externo para manter o SLM em regime air-gapped em runtime
-resource "google_compute_firewall" "deny_slm_egress" {
-  name      = "deny-slm-external-egress"
-  network   = google_compute_network.pipeline_vpc.name
-  direction = "EGRESS"
-  priority  = 1000
+# Cloud Router + Cloud NAT para permitir pull das imagens Docker sem IP público na VM
+resource "google_compute_router" "pipeline_router" {
+  name    = "otel-ocsf-router"
+  region  = var.region
+  network = google_compute_network.pipeline_vpc.id
+}
 
-  deny {
-    protocol = "all"
+resource "google_compute_router_nat" "pipeline_nat" {
+  name                               = "otel-ocsf-nat"
+  router                             = google_compute_router.pipeline_router.name
+  region                             = var.region
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
+# Permite SSH exclusivamente via Identity-Aware Proxy (IAP) para túnel ao Splunk (porta 8000)
+resource "google_compute_firewall" "allow_iap_ssh" {
+  name      = "allow-iap-ssh"
+  network   = google_compute_network.pipeline_vpc.name
+  direction = "INGRESS"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
   }
 
-  destination_ranges = ["0.0.0.0/0"]
-  target_tags        = ["slm-airgapped"]
+  source_ranges = ["35.235.240.0/20"]
+  target_tags   = ["otel-collector"]
 }
 
 # Permite comunicação interna na sub-rede (OTel Collector <-> AI Resilience <-> SLM)
@@ -41,11 +86,13 @@ resource "google_compute_firewall" "allow_internal" {
 
 # Tópicos Pub/Sub: Ingestão e Quarentena (DLQ)
 resource "google_pubsub_topic" "telemetry_ingest" {
-  name = "telemetry-ingest"
+  name       = "telemetry-ingest"
+  depends_on = [google_project_service.services]
 }
 
 resource "google_pubsub_topic" "telemetry_dlq" {
-  name = "telemetry-dlq"
+  name       = "telemetry-dlq"
+  depends_on = [google_project_service.services]
 }
 
 resource "google_pubsub_subscription" "telemetry_ingest_sub" {
@@ -58,10 +105,27 @@ resource "google_pubsub_subscription" "telemetry_ingest_sub" {
   }
 }
 
+# Log Sink do Tenant GCP: envia Cloud Audit Logs reais para o Pub/Sub
+resource "google_logging_project_sink" "audit_sink" {
+  name        = "gcp-audit-to-otel-pubsub"
+  project     = var.project_id
+  destination = "pubsub.googleapis.com/${google_pubsub_topic.telemetry_ingest.id}"
+  filter      = "log_id(\"cloudaudit.googleapis.com/activity\") OR log_id(\"cloudaudit.googleapis.com/data_access\")"
+
+  unique_writer_identity = true
+}
+
+resource "google_pubsub_topic_iam_member" "sink_publisher" {
+  topic  = google_pubsub_topic.telemetry_ingest.name
+  role   = "roles/pubsub.publisher"
+  member = google_logging_project_sink.audit_sink.writer_identity
+}
+
 # Service Account dedicada com princípio do menor privilégio (IAM)
 resource "google_service_account" "collector_sa" {
   account_id   = "otel-ocsf-collector-sa"
   display_name = "OTel Collector & AI Resilience SA (Least Privilege)"
+  depends_on   = [google_project_service.services]
 }
 
 resource "google_pubsub_subscription_iam_member" "subscriber_perm" {
@@ -82,6 +146,14 @@ resource "google_project_iam_member" "log_writer" {
   member  = "serviceAccount:${google_service_account.collector_sa.email}"
 }
 
+resource "google_artifact_registry_repository_iam_member" "artifact_reader" {
+  project    = var.project_id
+  location   = var.region
+  repository = google_artifact_registry_repository.tcc_repo.name
+  role       = "roles/artifactregistry.reader"
+  member     = "serviceAccount:${google_service_account.collector_sa.email}"
+}
+
 # VM econômica (e2-standard-4) para OTel Collector + Gemma 3 1B (GGUF 4-bit)
 resource "google_compute_instance" "pipeline_node" {
   name         = "otel-ocsf-slm-node"
@@ -99,7 +171,7 @@ resource "google_compute_instance" "pipeline_node" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 30
+      size  = 50
     }
   }
 
@@ -114,7 +186,12 @@ resource "google_compute_instance" "pipeline_node" {
 
   metadata_startup_script = <<-EOF
     #!/bin/bash
-    apt-get update && apt-get install -y docker.io docker-compose-v2
+    set -e
+    apt-get update && apt-get install -y docker.io docker-compose-v2 git
     systemctl enable --now docker
+    mkdir -p /opt/otel/data
+    if [ ! -d /opt/otel/prototipo-puc ]; then
+      git clone https://github.com/mvbaldivia/prototipo-puc.git /opt/otel/prototipo-puc || true
+    fi
   EOF
 }

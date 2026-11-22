@@ -1,0 +1,62 @@
+services:
+  splunk:
+    image: splunk/splunk:latest
+    container_name: splunk-gcp
+    environment:
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-Changeme123!}
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+    ports:
+      - "127.0.0.1:8000:8000"  # Acessível apenas via túnel IAP (sem exposição pública)
+    volumes:
+      - ./splunk/indexes.conf:/opt/splunk/etc/system/local/indexes.conf:ro
+      - splunk_gcp_var:/opt/splunk/var
+    networks:
+      - telemetry_net
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+    volumes:
+      - ./otel-collector/otel-collector-gcp-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./data:/var/log/otel-out
+    depends_on:
+      - splunk
+    networks:
+      - telemetry_net
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_gcp_models:/root/.ollama
+    networks:
+      - ai_airgapped_net
+    restart: unless-stopped
+
+  ai-resilience:
+    build:
+      context: .
+      dockerfile: ai-resilience/Dockerfile
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - SLM_MODEL=gemma3:1b
+    depends_on:
+      - ollama
+    networks:
+      - telemetry_net
+      - ai_airgapped_net
+
+networks:
+  telemetry_net:
+    driver: bridge
+  ai_airgapped_net:
+    driver: bridge
+    internal: true
+
+volumes:
+  splunk_gcp_var:
+  ollama_gcp_models:

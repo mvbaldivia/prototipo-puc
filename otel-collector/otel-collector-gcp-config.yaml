@@ -1,0 +1,134 @@
+receivers:
+  googlecloudpubsub:
+    project: prototipo-puc
+    subscription: projects/prototipo-puc/subscriptions/telemetry-ingest-sub
+    encoding: raw_text
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 1024
+
+  batch:
+    timeout: 200ms
+    send_batch_size: 512
+
+  transform/ocsf_6003:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - 'set(body, ParseJSON(body)) where IsString(body)'
+          - 'set(cache["raw"], body)'
+          - 'set(attributes["_raw_payload"], body)'
+          - 'set(body, ParseJSON("{}"))'
+
+          # Cabeçalho canônico OCSF v1.9.0 - API Activity (6003)
+          - 'set(body["category_uid"], 6)'
+          - 'set(body["category_name"], "Application Activity")'
+          - 'set(body["class_uid"], 6003)'
+          - 'set(body["class_name"], "API Activity")'
+          - 'set(body["activity_id"], 1)'
+          - 'set(body["activity_name"], "Create")'
+          - 'set(body["type_uid"], 600301)'
+          - 'set(body["severity_id"], 1)'
+          - 'set(body["severity"], "Informational")'
+          - 'set(body["status_id"], 1)'
+          - 'set(body["status"], "Success")'
+          - 'set(body["metadata"]["version"], "1.9.0")'
+
+          # GCP Cloud Audit Logs (ProtoJSON v2) -> OCSF 6003
+          - 'set(body["metadata"]["product"]["vendor_name"], "Google Cloud") where cache["raw"]["protoPayload"]["serviceName"] != nil'
+          - 'set(body["metadata"]["product"]["name"], "Cloud Audit Logs") where cache["raw"]["protoPayload"]["serviceName"] != nil'
+          - 'set(body["api"]["service"]["name"], cache["raw"]["protoPayload"]["serviceName"]) where cache["raw"]["protoPayload"]["serviceName"] != nil'
+          - 'set(body["api"]["operation"], cache["raw"]["protoPayload"]["methodName"]) where cache["raw"]["protoPayload"]["methodName"] != nil'
+          - 'set(body["actor"]["user"]["uid"], cache["raw"]["protoPayload"]["authenticationInfo"]["principalEmail"]) where cache["raw"]["protoPayload"]["authenticationInfo"]["principalEmail"] != nil'
+          - 'set(body["src_endpoint"]["ip"], cache["raw"]["protoPayload"]["requestMetadata"]["callerIp"]) where cache["raw"]["protoPayload"]["requestMetadata"]["callerIp"] != nil'
+
+          # AWS CloudTrail -> OCSF 6003
+          - 'set(body["metadata"]["product"]["vendor_name"], "AWS") where cache["raw"]["eventSource"] != nil'
+          - 'set(body["metadata"]["product"]["name"], "CloudTrail") where cache["raw"]["eventSource"] != nil'
+          - 'set(body["api"]["service"]["name"], cache["raw"]["eventSource"]) where cache["raw"]["eventSource"] != nil'
+          - 'set(body["api"]["operation"], cache["raw"]["eventName"]) where cache["raw"]["eventName"] != nil'
+          - 'set(body["src_endpoint"]["ip"], cache["raw"]["sourceIPAddress"]) where cache["raw"]["sourceIPAddress"] != nil'
+          - 'set(body["actor"]["user"]["uid"], cache["raw"]["userIdentity"]["arn"]) where cache["raw"]["userIdentity"]["arn"] != nil'
+
+          # Azure Activity Log (ARM) -> OCSF 6003
+          - 'set(body["metadata"]["product"]["vendor_name"], "Microsoft") where cache["raw"]["operationName"]["value"] != nil'
+          - 'set(body["metadata"]["product"]["name"], "Azure Activity Log") where cache["raw"]["operationName"]["value"] != nil'
+          - 'set(body["api"]["service"]["name"], "management.azure.com") where cache["raw"]["operationName"]["value"] != nil'
+          - 'set(body["api"]["operation"], cache["raw"]["operationName"]["value"]) where cache["raw"]["operationName"]["value"] != nil'
+          - 'set(body["actor"]["user"]["uid"], cache["raw"]["caller"]) where cache["raw"]["caller"] != nil'
+          - 'set(body["src_endpoint"]["ip"], cache["raw"]["httpRequest"]["clientIpAddress"]) where cache["raw"]["httpRequest"]["clientIpAddress"] != nil'
+
+  filter/drop_invalid:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'body["api"]["operation"] == nil or body["src_endpoint"]["ip"] == nil'
+
+  filter/drop_valid:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'body["api"]["operation"] != nil and body["src_endpoint"]["ip"] != nil'
+
+  transform/clean_nominal:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - 'delete_key(attributes, "_raw_payload")'
+
+  transform/quarantine_meta:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - 'set(body, ParseJSON("{}"))'
+          - 'set(body["quarantine_status"], "QUARANTINED_SCHEMA_DRIFT")'
+          - 'set(body["quarantine_reason"], "Missing required OCSF v1.9.0 fields (api.operation or src_endpoint.ip)")'
+          - 'set(body["target_ocsf_version"], "1.9.0")'
+          - 'set(body["raw_payload"], attributes["_raw_payload"])'
+          - 'delete_key(attributes, "_raw_payload")'
+
+exporters:
+  file/ocsf_out:
+    path: /var/log/otel-out/ocsf_6003_normalized.jsonl
+  file/dlq_out:
+    path: /var/log/otel-out/dlq_quarantine.jsonl
+  splunk_hec:
+    token: "${env:SPLUNK_HEC_TOKEN}"
+    endpoint: "https://splunk:8088/services/collector"
+    source: "otel-collector-gcp"
+    sourcetype: "ocsf:api_activity:6003"
+    index: "otel_ocsf"
+    tls:
+      insecure_skip_verify: true
+  splunk_hec/quarantine:
+    token: "${env:SPLUNK_HEC_TOKEN}"
+    endpoint: "https://splunk:8088/services/collector"
+    source: "otel-collector-gcp-dlq"
+    sourcetype: "ocsf:quarantine:dlq"
+    index: "otel_ocsf"
+    tls:
+      insecure_skip_verify: true
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    logs/nominal:
+      receivers: [googlecloudpubsub, otlp]
+      processors: [memory_limiter, transform/ocsf_6003, filter/drop_invalid, transform/clean_nominal, batch]
+      exporters: [file/ocsf_out, splunk_hec, debug]
+    logs/quarantine:
+      receivers: [googlecloudpubsub, otlp]
+      processors: [memory_limiter, transform/ocsf_6003, filter/drop_valid, transform/quarantine_meta, batch]
+      exporters: [file/dlq_out, splunk_hec/quarantine, debug]

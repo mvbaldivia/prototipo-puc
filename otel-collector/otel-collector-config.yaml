@@ -51,6 +51,14 @@ processors:
 exporters:
   file/ocsf_out:
     path: /var/log/otel-out/ocsf_6003_normalized.jsonl
+  splunk_hec:
+    token: "${env:SPLUNK_HEC_TOKEN}"
+    endpoint: "${env:SPLUNK_HEC_ENDPOINT}"
+    source: "otel-collector"
+    sourcetype: "ocsf:api_activity:6003"
+    index: "otel_ocsf"
+    tls:
+      insecure_skip_verify: true
   debug:
     verbosity: basic
 
@@ -59,4 +67,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [memory_limiter, transform/ocsf_6003, batch]
-      exporters: [file/ocsf_out, debug]
+      exporters: [file/ocsf_out, splunk_hec, debug]

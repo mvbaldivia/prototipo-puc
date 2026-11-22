@@ -2,6 +2,11 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.114.0
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+      - SPLUNK_HEC_ENDPOINT=${SPLUNK_HEC_ENDPOINT:-https://host.docker.internal:8088/services/collector}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./otel-collector/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
       - ./data:/var/log/otel-out

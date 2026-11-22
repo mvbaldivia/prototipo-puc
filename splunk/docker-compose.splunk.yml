@@ -1,0 +1,19 @@
+services:
+  splunk:
+    image: splunk/splunk:latest
+    container_name: splunk-local
+    environment:
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_PASSWORD=Changeme123!
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+    ports:
+      - "8000:8000"   # Splunk Web UI
+      - "8088:8088"   # HTTP Event Collector (HEC) - usado pelo OTel Collector
+      - "9997:9997"   # Splunk Forwarder (S2S)
+    volumes:
+      - ./indexes.conf:/opt/splunk/etc/system/local/indexes.conf:ro
+      - splunk_var:/opt/splunk/var
+    restart: unless-stopped
+
+volumes:
+  splunk_var:

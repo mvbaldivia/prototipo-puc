@@ -224,6 +224,12 @@ resource "google_project_iam_member" "deploy_log_writer" {
   member  = "serviceAccount:${google_service_account.github_deploy_sa.email}"
 }
 
+resource "google_service_account_iam_member" "deploy_self_act_as" {
+  service_account_id = google_service_account.github_deploy_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_deploy_sa.email}"
+}
+
 # VM econômica (e2-standard-4) para OTel Collector + Gemma 3 1B (GGUF 4-bit)
 resource "google_compute_instance" "pipeline_node" {
   name         = "otel-ocsf-slm-node"

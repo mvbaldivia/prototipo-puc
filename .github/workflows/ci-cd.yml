@@ -57,4 +57,8 @@ jobs:
           project_id: prototipo-puc
 
       - name: Disparar Cloud Build para atualizar protótipo na VM
-        run: gcloud builds submit . --config=cloudbuild.yaml --project=prototipo-puc
+        run: >
+          gcloud builds submit .
+          --config=cloudbuild.yaml
+          --project=prototipo-puc
+          --service-account="projects/prototipo-puc/serviceAccounts/github-deploy-sa@prototipo-puc.iam.gserviceaccount.com"

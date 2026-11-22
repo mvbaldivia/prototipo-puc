@@ -18,3 +18,6 @@ steps:
 
 images:
   - "us-central1-docker.pkg.dev/prototipo-puc/tcc-repo/ai-resilience:$SHORT_SHA"
+
+options:
+  logging: CLOUD_LOGGING_ONLY

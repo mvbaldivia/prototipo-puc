@@ -1,0 +1,118 @@
+<dashboard version="1.1" theme="dark">
+  <label>TCC PUCPR — Pipeline Autônomo OTel + OCSF v1.9.0 + Gemma 3 1B</label>
+  <description>Evidências experimentais: Conformidade OCSF 6003, Quarentena DLQ, Desempenho (EPS/Latência) e Acurácia Semântica (ACS)</description>
+
+  <row>
+    <panel>
+      <title>Eventos Normalizados (OCSF v1.9.0 / 6003)</title>
+      <single>
+        <search>
+          <query>index="otel_ocsf" sourcetype="ocsf:api_activity:6003" | stats count</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="useColors">1</option>
+        <option name="rangeColors">["0x53a051","0x53a051"]</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Eventos Isolados em Quarentena (DLQ)</title>
+      <single>
+        <search>
+          <query>index="otel_ocsf" sourcetype="ocsf:quarantine:dlq" | stats count</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="useColors">1</option>
+        <option name="rangeColors">["0xf8be34","0xdc4e41"]</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Conformidade Semântica OCSF (1.500 eventos)</title>
+      <single>
+        <search>
+          <query>index="otel_ocsf" sourcetype="ocsf:benchmark:metrics" metric_group="conformance" | stats latest(conformance_pct) as val | eval val=val."%"</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Redução de Bytes Indexáveis (Ganho SIEM)</title>
+      <single>
+        <search>
+          <query>index="otel_ocsf" sourcetype="ocsf:benchmark:metrics" metric_group="conformance" | stats latest(byte_reduction_pct) as val | eval val=val."%"</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Distribuição Multi-Cloud por Provedor (OCSF 6003)</title>
+      <chart>
+        <search>
+          <query>index="otel_ocsf" sourcetype="ocsf:api_activity:6003" | stats count by metadata.product.vendor_name | rename metadata.product.vendor_name as Provedor, count as Eventos</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+
+    <panel>
+      <title>Top Operações de API Normalizadas (api.operation)</title>
+      <chart>
+        <search>
+          <query>index="otel_ocsf" sourcetype="ocsf:api_activity:6003" | top limit=10 api.operation</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Acurácia Semântica — Gemma 3 1B (20 Schemas Inéditos)</title>
+      <chart>
+        <search>
+          <query>index="otel_ocsf" sourcetype="ocsf:benchmark:metrics" metric_group="ai_accuracy" | stats latest(score_pct) as "Acurácia (%)" by dimension</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.axisY.maximumNumber">100</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+
+    <panel>
+      <title>Desempenho OTel Collector — Vazão (EPS) por Lote</title>
+      <chart>
+        <search>
+          <query>index="otel_ocsf" sourcetype="ocsf:benchmark:metrics" metric_group="throughput" | stats latest(measured_eps) as "Vazão (EPS)", latest(avg_latency_per_event_ms) as "Latência (ms/evento)" by events_label</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.overlayFields">"Latência (ms/evento)"</option>
+        <option name="charting.axisY2.enabled">1</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+</dashboard>

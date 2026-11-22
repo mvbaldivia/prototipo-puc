@@ -34,6 +34,9 @@ def validate_ottl_syntax(statements: List[str]) -> Tuple[bool, List[str]]:
     """Valida sintaxe OTTL em sandbox e rejeita caminhos fora do contrato OCSF."""
     errors: List[str] = []
     for stmt in statements:
+        if not isinstance(stmt, str):
+            errors.append(f"Tipo inválido na regra OTTL (esperado string): {type(stmt).__name__}")
+            continue
         match = _OTTL_SET_RE.match(stmt.strip())
         if not match:
             errors.append(f"Sintaxe OTTL inválida ou função não permitida: {stmt}")
@@ -60,6 +63,8 @@ def apply_ottl_sandbox(statements: List[str], raw_event: Dict[str, Any], vendor:
     }
 
     for stmt in statements:
+        if not isinstance(stmt, str):
+            continue
         match = _OTTL_SET_RE.match(stmt.strip())
         if not match:
             continue

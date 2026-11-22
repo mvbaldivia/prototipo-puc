@@ -3,13 +3,14 @@ services:
     image: splunk/splunk:latest
     container_name: splunk-gcp
     environment:
+      - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
       - SPLUNK_START_ARGS=--accept-license
       - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-Changeme123!}
       - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+      - SPLUNK_HTTP_PORT=8088
     ports:
       - "127.0.0.1:8000:8000"  # Acessível apenas via túnel IAP (sem exposição pública)
     volumes:
-      - ./splunk/indexes.conf:/opt/splunk/etc/system/local/indexes.conf:ro
       - splunk_gcp_var:/opt/splunk/var
     networks:
       - telemetry_net

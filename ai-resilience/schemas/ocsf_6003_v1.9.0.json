@@ -85,7 +85,10 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name"],
+        "anyOf": [
+          { "required": ["name"] },
+          { "required": ["uid"] }
+        ],
         "properties": {
           "name": { "type": "string" },
           "uid": { "type": "string" },

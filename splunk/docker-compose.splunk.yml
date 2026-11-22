@@ -3,6 +3,7 @@ services:
     image: splunk/splunk:latest
     container_name: splunk-local
     environment:
+      - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
       - SPLUNK_START_ARGS=--accept-license
       - SPLUNK_PASSWORD=Changeme123!
       - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}

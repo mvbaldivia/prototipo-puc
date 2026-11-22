@@ -50,6 +50,10 @@ processors:
           - 'set(body["api"]["operation"], cache["raw"]["protoPayload"]["methodName"]) where cache["raw"]["protoPayload"]["methodName"] != nil'
           - 'set(body["actor"]["user"]["uid"], cache["raw"]["protoPayload"]["authenticationInfo"]["principalEmail"]) where cache["raw"]["protoPayload"]["authenticationInfo"]["principalEmail"] != nil'
           - 'set(body["src_endpoint"]["ip"], cache["raw"]["protoPayload"]["requestMetadata"]["callerIp"]) where cache["raw"]["protoPayload"]["requestMetadata"]["callerIp"] != nil'
+          - 'set(body["src_endpoint"]["svc_name"], "gcp-internal") where cache["raw"]["protoPayload"]["serviceName"] != nil and cache["raw"]["protoPayload"]["requestMetadata"]["callerIp"] == nil'
+          - 'set(body["resources"], ParseJSON("[{}]")) where cache["raw"]["protoPayload"]["resourceName"] != nil'
+          - 'set(body["resources"][0]["uid"], cache["raw"]["protoPayload"]["resourceName"]) where cache["raw"]["protoPayload"]["resourceName"] != nil'
+          - 'set(body["resources"][0]["type"], "GCP Resource") where cache["raw"]["protoPayload"]["resourceName"] != nil'
 
           # AWS CloudTrail -> OCSF 6003
           - 'set(body["metadata"]["product"]["vendor_name"], "AWS") where cache["raw"]["eventSource"] != nil'
@@ -71,13 +75,13 @@ processors:
     error_mode: ignore
     logs:
       log_record:
-        - 'body["api"]["operation"] == nil or body["src_endpoint"]["ip"] == nil'
+        - 'body["api"]["operation"] == nil or body["api"]["service"]["name"] == nil or (body["src_endpoint"]["ip"] == nil and body["src_endpoint"]["svc_name"] == nil)'
 
   filter/drop_valid:
     error_mode: ignore
     logs:
       log_record:
-        - 'body["api"]["operation"] != nil and body["src_endpoint"]["ip"] != nil'
+        - 'body["api"]["operation"] != nil and body["api"]["service"]["name"] != nil and (body["src_endpoint"]["ip"] != nil or body["src_endpoint"]["svc_name"] != nil)'
 
   transform/clean_nominal:
     error_mode: ignore

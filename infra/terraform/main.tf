@@ -155,6 +155,13 @@ resource "google_artifact_registry_repository_iam_member" "artifact_reader" {
   member     = "serviceAccount:${google_service_account.collector_sa.email}"
 }
 
+# Service Account dedicada para CI/CD Deploy via Workload Identity Federation
+resource "google_service_account" "github_deploy_sa" {
+  account_id   = "github-deploy-sa"
+  display_name = "GitHub Actions Deploy SA (CI/CD)"
+  depends_on   = [google_project_service.services]
+}
+
 # Workload Identity Federation para GitHub Actions (CD sem chave JSON estática)
 resource "google_iam_workload_identity_pool" "github_pool" {
   workload_identity_pool_id = "github-pool"
@@ -182,27 +189,39 @@ resource "google_iam_workload_identity_pool_provider" "github_provider" {
 }
 
 resource "google_service_account_iam_member" "github_wif_binding" {
-  service_account_id = google_service_account.collector_sa.name
+  service_account_id = google_service_account.github_deploy_sa.name
   role               = "roles/iam.workloadIdentityUser"
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/mvbaldivia/prototipo-puc"
 }
 
-resource "google_project_iam_member" "cloudbuild_editor" {
+resource "google_project_iam_member" "deploy_cloudbuild_editor" {
   project = var.project_id
   role    = "roles/cloudbuild.builds.editor"
-  member  = "serviceAccount:${google_service_account.collector_sa.email}"
+  member  = "serviceAccount:${google_service_account.github_deploy_sa.email}"
 }
 
-resource "google_project_iam_member" "artifact_writer" {
+resource "google_project_iam_member" "deploy_artifact_writer" {
   project = var.project_id
   role    = "roles/artifactregistry.writer"
-  member  = "serviceAccount:${google_service_account.collector_sa.email}"
+  member  = "serviceAccount:${google_service_account.github_deploy_sa.email}"
 }
 
-resource "google_project_iam_member" "storage_admin_cb" {
+resource "google_project_iam_member" "deploy_storage_admin" {
   project = var.project_id
-  role    = "roles/storage.objectAdmin"
-  member  = "serviceAccount:${google_service_account.collector_sa.email}"
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${google_service_account.github_deploy_sa.email}"
+}
+
+resource "google_project_iam_member" "deploy_service_usage" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageConsumer"
+  member  = "serviceAccount:${google_service_account.github_deploy_sa.email}"
+}
+
+resource "google_project_iam_member" "deploy_log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.github_deploy_sa.email}"
 }
 
 # VM econômica (e2-standard-4) para OTel Collector + Gemma 3 1B (GGUF 4-bit)

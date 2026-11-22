@@ -22,6 +22,10 @@ output "collector_service_account" {
   value = google_service_account.collector_sa.email
 }
 
+output "deploy_service_account" {
+  value = google_service_account.github_deploy_sa.email
+}
+
 output "pipeline_vm_name" {
   value = google_compute_instance.pipeline_node.name
 }

@@ -1,3 +1,6 @@
+substitutions:
+  _IMAGE_TAG: "latest"
+
 steps:
   - name: "python:3.12-slim"
     entrypoint: "bash"
@@ -11,13 +14,13 @@ steps:
     args:
       - "build"
       - "-t"
-      - "us-central1-docker.pkg.dev/prototipo-puc/tcc-repo/ai-resilience:$SHORT_SHA"
+      - "us-central1-docker.pkg.dev/prototipo-puc/tcc-repo/ai-resilience:${_IMAGE_TAG}"
       - "-f"
       - "ai-resilience/Dockerfile"
       - "."
 
 images:
-  - "us-central1-docker.pkg.dev/prototipo-puc/tcc-repo/ai-resilience:$SHORT_SHA"
+  - "us-central1-docker.pkg.dev/prototipo-puc/tcc-repo/ai-resilience:${_IMAGE_TAG}"
 
 options:
   logging: CLOUD_LOGGING_ONLY

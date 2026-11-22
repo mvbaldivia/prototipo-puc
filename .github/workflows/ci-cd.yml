@@ -61,4 +61,5 @@ jobs:
           gcloud builds submit .
           --config=cloudbuild.yaml
           --project=prototipo-puc
+          --substitutions=_IMAGE_TAG=${{ github.sha }}
           --service-account="projects/prototipo-puc/serviceAccounts/github-deploy-sa@prototipo-puc.iam.gserviceaccount.com"

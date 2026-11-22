@@ -5,6 +5,7 @@ locals {
     "logging.googleapis.com",
     "artifactregistry.googleapis.com",
     "cloudbuild.googleapis.com",
+    "iam.googleapis.com",
     "iamcredentials.googleapis.com",
   ]
 }
@@ -154,6 +155,56 @@ resource "google_artifact_registry_repository_iam_member" "artifact_reader" {
   member     = "serviceAccount:${google_service_account.collector_sa.email}"
 }
 
+# Workload Identity Federation para GitHub Actions (CD sem chave JSON estática)
+resource "google_iam_workload_identity_pool" "github_pool" {
+  workload_identity_pool_id = "github-pool"
+  display_name              = "GitHub Actions Pool"
+  description               = "Pool de federação para CI/CD do repositório mvbaldivia/prototipo-puc"
+  depends_on                = [google_project_service.services]
+}
+
+resource "google_iam_workload_identity_pool_provider" "github_provider" {
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github_pool.workload_identity_pool_id
+  workload_identity_pool_provider_id = "github-provider"
+  display_name                       = "GitHub OIDC Provider"
+
+  attribute_mapping = {
+    "google.subject"       = "assertion.sub"
+    "attribute.actor"      = "assertion.actor"
+    "attribute.repository" = "assertion.repository"
+  }
+
+  attribute_condition = "assertion.repository == \"mvbaldivia/prototipo-puc\""
+
+  oidc {
+    issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+}
+
+resource "google_service_account_iam_member" "github_wif_binding" {
+  service_account_id = google_service_account.collector_sa.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/mvbaldivia/prototipo-puc"
+}
+
+resource "google_project_iam_member" "cloudbuild_editor" {
+  project = var.project_id
+  role    = "roles/cloudbuild.builds.editor"
+  member  = "serviceAccount:${google_service_account.collector_sa.email}"
+}
+
+resource "google_project_iam_member" "artifact_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_service_account.collector_sa.email}"
+}
+
+resource "google_project_iam_member" "storage_admin_cb" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.collector_sa.email}"
+}
+
 # VM econômica (e2-standard-4) para OTel Collector + Gemma 3 1B (GGUF 4-bit)
 resource "google_compute_instance" "pipeline_node" {
   name         = "otel-ocsf-slm-node"
@@ -187,10 +238,14 @@ resource "google_compute_instance" "pipeline_node" {
   metadata_startup_script = <<-EOF
     #!/bin/bash
     set -e
-    apt-get update && apt-get install -y docker.io docker-compose-v2 git
-    systemctl enable --now docker
+    apt-get update && apt-get install -y git curl
+    if ! command -v docker >/dev/null 2>&1; then
+      curl -fsSL https://get.docker.com | sh
+      systemctl enable --now docker
+    fi
     mkdir -p /opt/otel/data
-    if [ ! -d /opt/otel/prototipo-puc ]; then
+    if [ ! -d /opt/otel/prototipo-puc/.git ]; then
+      rm -rf /opt/otel/prototipo-puc
       git clone https://github.com/mvbaldivia/prototipo-puc.git /opt/otel/prototipo-puc || true
     fi
   EOF

@@ -1,0 +1,50 @@
+{
+  "environment": "GCP Compute Engine e2-standard-4 (4 vCPUs, 16 GB RAM, us-central1-a, Spot)",
+  "slm_model": "gemma3:1b (GGUF 4-bit, 806 MB, CPU air-gapped)",
+  "conformance_and_bytes": {
+    "total_events": 1500,
+    "ocsf_conformant": 1500,
+    "conformance_pct": 100.0,
+    "raw_bytes": 1073528,
+    "ocsf_bytes": 783528,
+    "byte_reduction_pct": 27.01
+  },
+  "throughput": [
+    {
+      "events": 1000,
+      "elapsed_s": 0.853,
+      "measured_eps": 1172.2,
+      "avg_latency_per_event_ms": 0.8531,
+      "drop_rate_pct": 0.0
+    },
+    {
+      "events": 5000,
+      "elapsed_s": 0.898,
+      "measured_eps": 5566.3,
+      "avg_latency_per_event_ms": 0.1796,
+      "drop_rate_pct": 0.0
+    },
+    {
+      "events": 10000,
+      "elapsed_s": 2.008,
+      "measured_eps": 4979.6,
+      "avg_latency_per_event_ms": 0.2008,
+      "drop_rate_pct": 0.0
+    }
+  ],
+  "ai_schema_drift": {
+    "total_schemas": 20,
+    "avg_acs_pct": 72.5,
+    "aws_acs_pct": 82.14,
+    "azure_acs_pct": 67.86,
+    "gcp_acs_pct": 66.67,
+    "syntax_approval_pct": 95.0,
+    "schema_valid_pct": 70.0,
+    "avg_inference_s": 8.08
+  },
+  "security_adversarial": {
+    "total_adversarial": 30,
+    "injection_or_pii_leaked_pct": 0.0,
+    "invalid_rule_retention_pct": 100.0
+  }
+}

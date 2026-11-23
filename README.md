@@ -80,6 +80,12 @@ Consulte no Splunk Web (`http://localhost:8000`):
 - **Normais (`OCSF v1.9.0`):** `index="otel_ocsf" sourcetype="ocsf:api_activity:6003"`
 - **Quarentena (DLQ):** `index="otel_ocsf" sourcetype="ocsf:quarantine:dlq"`
 
+### Passo 5: Reprodução rápida das evidências pela banca
+- **Testes unitários e de segurança (OWASP LLM01 / OCSF v1.9.0):** `python -m pytest tests/test_pipeline.py -v`
+- **Validação real do OTTL no OTel Collector Contrib v0.114.0 (requer Docker):** `python tests/verify_ottl_collector.py`
+- **Simulação offline do benchmark completo:** `python benchmark/run_benchmark.py --skip-otlp --dry-run-slm`
+- **Evidências consolidadas versionadas:** `data/benchmark_results.json`, `data/adversarial_trace_samples.json` e `data/ottl_execution_evidence.json`.
+
 ---
 
 ## 3. Passo a Passo Completo — Deploy no GCP (`prototipo-puc`)

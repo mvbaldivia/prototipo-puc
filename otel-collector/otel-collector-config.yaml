@@ -41,7 +41,14 @@ processors:
           - 'set(body["severity"], "Informational")'
           - 'set(body["status_id"], 1)'
           - 'set(body["status"], "Success")'
+          - 'set(body["metadata"], ParseJSON("{}"))'
           - 'set(body["metadata"]["version"], "1.9.0")'
+          - 'set(body["metadata"]["product"], ParseJSON("{}"))'
+          - 'set(body["api"], ParseJSON("{}"))'
+          - 'set(body["api"]["service"], ParseJSON("{}"))'
+          - 'set(body["src_endpoint"], ParseJSON("{}"))'
+          - 'set(body["actor"], ParseJSON("{}"))'
+          - 'set(body["actor"]["user"], ParseJSON("{}"))'
 
           # AWS CloudTrail -> OCSF 6003
           - 'set(body["metadata"]["product"]["vendor_name"], "AWS") where cache["raw"]["eventSource"] != nil'

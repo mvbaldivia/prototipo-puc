@@ -2,7 +2,7 @@
 
 Implementação prática do artigo **"Pipeline Autônomo de Normalização Semântica de Telemetria Multi-Cloud Baseado em OpenTelemetry, OCSF e Small Language Models para Engenharia de Detecção"**.
 
-- **Projeto GCP:** `prototipo-puc` (`811890592302`)
+- **Projeto GCP:** `prototipo-puc`
 - **Esquema Canônico:** OCSF `v1.9.0` — Classe `API Activity (6003)`
 - **SLM Local:** `Gemma 3 1B` (GGUF 4-bit, `806 MB`, execução *air-gapped* em CPU)
 - **SIEM (Local e Cloud):** Splunk Enterprise via HTTP Event Collector (HEC) na porta `8088`, índice `otel_ocsf`

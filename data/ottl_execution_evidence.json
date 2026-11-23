@@ -1,0 +1,61 @@
+{
+  "collector_image": "otel/opentelemetry-collector-contrib:0.114.0",
+  "input_cloudtrail": {
+    "eventVersion": "1.08",
+    "eventTime": "2026-10-12T14:20:00Z",
+    "eventSource": "s3.amazonaws.com",
+    "eventName": "CreateBucket",
+    "sourceIPAddress": "198.51.100.42",
+    "userIdentity": {
+      "type": "IAMUser",
+      "arn": "arn:aws:iam::123456789012:user/sec-admin"
+    },
+    "requestParameters": {
+      "bucketName": "corp-audit-logs-prod"
+    }
+  },
+  "collector_ocsf_output": {
+    "category_uid": 6,
+    "category_name": "Application Activity",
+    "class_uid": 6003,
+    "class_name": "API Activity",
+    "activity_id": 1,
+    "activity_name": "Create",
+    "type_uid": 600301,
+    "severity_id": 1,
+    "severity": "Informational",
+    "status_id": 1,
+    "status": "Success",
+    "metadata": {
+      "version": "1.9.0",
+      "product": {
+        "vendor_name": "AWS",
+        "name": "CloudTrail"
+      }
+    },
+    "api": {
+      "service": {
+        "name": "s3.amazonaws.com"
+      },
+      "operation": "CreateBucket"
+    },
+    "src_endpoint": {
+      "ip": "198.51.100.42"
+    },
+    "actor": {
+      "user": {
+        "uid": "arn:aws:iam::123456789012:user/sec-admin",
+        "type": "IAMUser"
+      }
+    },
+    "time": 1791814800000,
+    "resources": [
+      {
+        "name": "corp-audit-logs-prod",
+        "type": "S3 Bucket"
+      }
+    ]
+  },
+  "strict_schema_valid": true,
+  "strict_schema_notes": []
+}

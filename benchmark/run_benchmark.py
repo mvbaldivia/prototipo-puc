@@ -28,6 +28,7 @@ from slm_agent import build_delimited_prompt, propose_ottl_mapping
 from validator import (
     apply_ottl_sandbox,
     compute_semantic_field_accuracy,
+    extract_event_time_ms,
     validate_ocsf_event,
     validate_ottl_syntax,
 )
@@ -36,13 +37,14 @@ from validator import (
 def _normalize_base_event(ev: Dict[str, Any]) -> Dict[str, Any]:
     """Normaliza um evento base AWS/Azure/GCP com as mesmas regras OTTL da Camada 2."""
     provider = ev["provider"]
+    event_time_ms = extract_event_time_ms(ev)
     if provider == "AWS":
         return {
             "category_uid": 6,
             "class_uid": 6003,
             "activity_id": 1,
             "type_uid": 600301,
-            "time": 1763821200000,
+            "time": event_time_ms,
             "status_id": 1,
             "metadata": {"version": "1.9.0", "product": {"name": "CloudTrail", "vendor_name": "AWS"}},
             "actor": {"user": {"uid": ev["userIdentity"]["arn"]}},
@@ -56,7 +58,7 @@ def _normalize_base_event(ev: Dict[str, Any]) -> Dict[str, Any]:
             "class_uid": 6003,
             "activity_id": 1,
             "type_uid": 600301,
-            "time": 1763821260000,
+            "time": event_time_ms,
             "status_id": 1,
             "metadata": {"version": "1.9.0", "product": {"name": "Azure Activity Log", "vendor_name": "Microsoft"}},
             "actor": {"user": {"uid": ev["caller"]}},
@@ -70,7 +72,7 @@ def _normalize_base_event(ev: Dict[str, Any]) -> Dict[str, Any]:
         "class_uid": 6003,
         "activity_id": 1,
         "type_uid": 600301,
-        "time": 1763821320000,
+        "time": event_time_ms,
         "status_id": 1,
         "metadata": {"version": "1.9.0", "product": {"name": "Cloud Audit Logs", "vendor_name": "Google Cloud"}},
         "actor": {"user": {"uid": p["authenticationInfo"]["principalEmail"]}},

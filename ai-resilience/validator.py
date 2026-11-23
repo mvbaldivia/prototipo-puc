@@ -2,6 +2,7 @@
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -47,6 +48,23 @@ def validate_ottl_syntax(statements: List[str]) -> Tuple[bool, List[str]]:
     return (len(errors) == 0, errors)
 
 
+def extract_event_time_ms(raw_event: Dict[str, Any], default_ms: int = 1760000000000) -> int:
+    """Extrai o timestamp original do evento (ISO-8601 ou epoch ms) preservando a cronologia forense."""
+    for key in ("eventTime", "time", "receiveTimestamp", "timestamp", "eventTimestamp"):
+        val = raw_event.get(key)
+        if isinstance(val, (int, float)) and val > 0:
+            return int(val)
+        if isinstance(val, str) and val.strip():
+            try:
+                dt = datetime.fromisoformat(val.strip().replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return int(dt.timestamp() * 1000)
+            except ValueError:
+                continue
+    return default_ms
+
+
 def apply_ottl_sandbox(statements: List[str], raw_event: Dict[str, Any], vendor: str, product: str) -> Dict[str, Any]:
     """Aplica declarações OTTL validadas sobre um evento de teste construindo OCSF v1.9.0."""
     ocsf_event: Dict[str, Any] = {
@@ -54,7 +72,7 @@ def apply_ottl_sandbox(statements: List[str], raw_event: Dict[str, Any], vendor:
         "class_uid": 6003,
         "activity_id": 1,
         "type_uid": 600301,
-        "time": 1760000000000,
+        "time": extract_event_time_ms(raw_event),
         "status_id": 1,
         "metadata": {"version": "1.9.0", "product": {"name": product, "vendor_name": vendor}},
         "actor": {"user": {}},

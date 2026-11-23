@@ -17,11 +17,17 @@
   ],
   "properties": {
     "category_uid": { "const": 6 },
+    "category_name": { "type": "string" },
     "class_uid": { "const": 6003 },
+    "class_name": { "type": "string" },
     "activity_id": { "type": "integer", "enum": [0, 1, 2, 3, 4, 99] },
+    "activity_name": { "type": "string" },
     "type_uid": { "type": "integer", "minimum": 600300, "maximum": 600399 },
     "time": { "type": "integer", "minimum": 1 },
+    "severity_id": { "type": "integer", "enum": [0, 1, 2, 3, 4, 5, 6, 99] },
+    "severity": { "type": "string" },
     "status_id": { "type": "integer", "enum": [0, 1, 2, 99] },
+    "status": { "type": "string" },
     "metadata": {
       "type": "object",
       "additionalProperties": false,
@@ -50,6 +56,7 @@
           "required": ["uid"],
           "properties": {
             "uid": { "type": "string", "minLength": 1 },
+            "type": { "type": "string" },
             "name": { "type": "string" },
             "email_addr": { "type": "string" }
           }
